@@ -60,6 +60,19 @@ async def check_domain(
         signals.extend(s)
         evidence.extend(e)
 
+    # Geo/ASN enrichment per resolved IP (only entries with data).
+    enricher = request.app.state.enricher
+    geo: dict[str, dict] = {}
+    for ip in ips[:5]:
+        try:
+            info = await enricher.enrich_ip(ip)
+        except Exception:
+            info = {}
+        if info:
+            geo[ip] = info
+    if geo:
+        enrichment["geo"] = geo
+
     try:
         mx_hosts = resolve_mx_hosts(dom_lc)
     except Exception:

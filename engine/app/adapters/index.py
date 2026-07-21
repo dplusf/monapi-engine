@@ -17,7 +17,8 @@ from app.adapters.feeds import FeedDef
 
 @dataclass
 class IndexStore:
-    ip_trie: pytricia.PyTricia
+    ip_trie: pytricia.PyTricia  # IPv4, 32 bits
+    ip6_trie: pytricia.PyTricia  # IPv6, 128 bits
     domains: dict[str, set[str]]
     meta: dict[str, Any]
     meta_path: Path
@@ -31,9 +32,18 @@ class IndexStore:
             return
         loaded = load_index(index_dir)
         self.ip_trie = loaded.ip_trie
+        self.ip6_trie = loaded.ip6_trie
         self.domains = loaded.domains
         self.meta = loaded.meta
         self.meta_path = loaded.meta_path
+
+    def trie_for(self, ip: str) -> pytricia.PyTricia | None:
+        """Return the trie matching the IP version, or None if unparseable."""
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            return None
+        return self.ip_trie if addr.version == 4 else self.ip6_trie
 
 
 def _load_text_lines(path: Path) -> list[str]:
@@ -78,7 +88,8 @@ def build_index(
         shutil.rmtree(tmp)
     tmp.mkdir(parents=True, exist_ok=True)
 
-    trie = pytricia.PyTricia(32)
+    trie4 = pytricia.PyTricia(32)
+    trie6 = pytricia.PyTricia(128)
     domains: dict[str, set[str]] = {}
 
     for feed in feeds:
@@ -90,13 +101,14 @@ def build_index(
             entries = _parse_ip_cidr_file(f)
             for e in entries:
                 try:
-                    # Normalize IP -> /32 CIDR.
+                    # Normalize: bare IP -> /32 or /128 CIDR; pick trie by version.
                     if "/" not in e:
-                        ipaddress.IPv4Address(e)
-                        cidr = f"{e}/32"
+                        addr = ipaddress.ip_address(e)
+                        net = ipaddress.ip_network(f"{e}/{addr.max_prefixlen}")
                     else:
-                        ipaddress.IPv4Network(e, strict=False)
-                        cidr = e
+                        net = ipaddress.ip_network(e, strict=False)
+                    cidr = str(net)
+                    trie = trie4 if net.version == 4 else trie6
                 except Exception:
                     continue
 
@@ -123,10 +135,13 @@ def build_index(
             domains.setdefault(feed.category, set()).update(_parse_domain_file(f, feed.format))
 
     # Required by pytricia before pickling.
-    trie.freeze()
+    trie4.freeze()
+    trie6.freeze()
 
     with open(tmp / "ip_trie.pkl", "wb") as f:
-        pickle.dump(trie, f)
+        pickle.dump(trie4, f)
+    with open(tmp / "ip6_trie.pkl", "wb") as f:
+        pickle.dump(trie6, f)
     with open(tmp / "domains.pkl", "wb") as f:
         pickle.dump(domains, f)
 
@@ -148,16 +163,21 @@ def build_index(
 def load_index(index_dir: str) -> IndexStore:
     index_path = Path(index_dir)
     ip_file = index_path / "ip_trie.pkl"
+    ip6_file = index_path / "ip6_trie.pkl"
     dom_file = index_path / "domains.pkl"
     meta_file = index_path / "meta.json"
 
-    trie = pytricia.PyTricia(32)
+    trie4 = pytricia.PyTricia(32)
+    trie6 = pytricia.PyTricia(128)
     domains: dict[str, set[str]] = {}
     meta: dict[str, Any] = {}
 
     if ip_file.exists():
         with open(ip_file, "rb") as f:
-            trie = pickle.load(f)
+            trie4 = pickle.load(f)
+    if ip6_file.exists():
+        with open(ip6_file, "rb") as f:
+            trie6 = pickle.load(f)
     if dom_file.exists():
         with open(dom_file, "rb") as f:
             domains = pickle.load(f)
@@ -168,4 +188,4 @@ def load_index(index_dir: str) -> IndexStore:
         except Exception:
             pass
 
-    return IndexStore(ip_trie=trie, domains=domains, meta=meta, meta_path=meta_file)
+    return IndexStore(ip_trie=trie4, ip6_trie=trie6, domains=domains, meta=meta, meta_path=meta_file)

@@ -24,6 +24,8 @@ async def check_ip_endpoint(
     if index:
         index.maybe_reload(request.app.state.settings.index_dir)
     res = check_ip(index, ip, profile)
+    enrichment = dict(res.enrichment)
+    enrichment.update(await request.app.state.enricher.enrich_ip(ip))
     timing_ms = {"total": int((time.time() - t0) * 1000)}
     out = {
         "request_id": getattr(request.state, "request_id", ""),
@@ -35,7 +37,7 @@ async def check_ip_endpoint(
         "confidence": res.confidence,
         "signals": [s.__dict__ for s in res.signals],
         "evidence": [e.__dict__ for e in res.evidence],
-        "enrichment": res.enrichment,
+        "enrichment": enrichment,
         "timing_ms": timing_ms,
     }
     return out

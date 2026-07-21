@@ -1,43 +1,47 @@
-# CHECKLIST
-# - Run dev: docker compose -f fastapi/docker-compose.yml up --build
-# - Build:   docker compose -f fastapi/docker-compose.yml build
-# - Lint:    (optional) ruff/pyright not wired in MVP
-
 # monapi-engine (FastAPI)
 
-Minimal self-hostable abuse decision engine API (allow|challenge|block).
+Self-hostable abuse decision engine API (allow|challenge|block).
 
 What you get:
-- FastAPI API service
-- Worker that periodically downloads public threat/disposable feeds and builds a local index
-- Caddy reverse proxy (TLS on `api.monapi.io` when DNS points to the host)
+- FastAPI API service with policy profiles (`?profile=`)
+- Worker that periodically downloads public threat/disposable feeds, builds
+  a local IPv4+IPv6 index and keeps the GeoIP database fresh
+- Optional enrichment: Geo/ASN/rDNS via a local MMDB (ip66.dev, no account)
+- Optional email verification via Reoon (off by default, no SMTP probing)
 
 ## Quickstart (local)
 
-1) Copy env file:
-
 ```bash
-cp fastapi/.env.example fastapi/.env
-```
+cp .env.example .env
+docker compose up --build
 
-For production set in `fastapi/.env`:
-- `PUBLIC_HOST=api.monapi.io`
-- keep `ACME_EMAIL=monapi@projektsued.de`
-
-2) Start:
-
-```bash
-docker compose -f fastapi/docker-compose.yml up --build
-```
-
-3) Smoke:
-
-```bash
 curl http://localhost:18000/health
 curl -H "X-API-Key: dev-key-1" http://localhost:18000/v1/check/ip/1.1.1.1
+curl -H "X-API-Key: dev-key-1" "http://localhost:18000/v1/check/ip/1.1.1.1?profile=checkout"
 ```
+
+## Policy profiles
+
+Named variants of thresholds / weight overrides / ignored categories, defined
+in `app/data/policies.yaml`, selected per request via `?profile=<name>`.
+Unknown profiles return 400 with the list of available profiles.
+
+## Enrichment
+
+Set `ENRICHER=geoip` to add ASN, organization, country and rDNS hostname to
+IP responses. The MMDB is downloaded daily by the worker (or manually via
+`scripts/update-geoip.sh`). ip66 provides no city level; a MaxMind key can
+be added later without code changes.
+
+## Email checks
+
+No SMTP RCPT probing (protects the sending IP's reputation). Signals come
+from syntax validation, MX existence, disposable/free-mail lists, role
+accounts, typo detection and MX-IP reputation. Set `EMAIL_VERIFIER=reoon`
+plus `REOON_API_KEY` for external verification.
 
 ## Notes
 
-- Email checks try DNS (MX) + SMTP RCPT probing. Many clouds block outbound TCP/25; if blocked, the API returns `deliverability=unknown` (not a 500).
-- Feeds are downloaded into `fastapi/data/feeds/` and indexed into `fastapi/data/index/`.
+- Feeds land in `/data/feeds/`, the index in `/data/index/`, GeoIP in `/data/geoip/`.
+- Caddy reverse proxy is included for standalone TLS; behind an existing
+  reverse proxy (e.g. Traefik) run the API container without it.

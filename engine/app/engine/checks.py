@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import ipaddress
-import time
 from typing import Any
 
 from app.adapters.index import IndexStore
@@ -15,13 +13,17 @@ def _ip_signals(index: IndexStore, ip: str) -> tuple[list[Signal], list[Evidence
     signals: list[Signal] = []
     evidence: list[Evidence] = []
 
-    try:
-        ipaddress.IPv4Address(ip)
-    except Exception:
+    if index is None:
+        return signals, evidence
+
+    trie = index.trie_for(ip)
+    if trie is None:
+        # Unparseable address — no signals, but never a silent "allow"
+        # for a valid IPv6 anymore: valid v4/v6 both reach the lookup.
         return signals, evidence
 
     try:
-        hit = index.ip_trie.get(ip)
+        hit = trie.get(ip)
     except Exception:
         hit = None
 

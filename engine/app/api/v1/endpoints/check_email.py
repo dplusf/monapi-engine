@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request
 
 from email_validator import EmailNotValidError, validate_email
 
+from app.adapters.base import NullVerifier
 from app.api.deps import get_profile
 from app.core.auth import require_api_key
 from app.core.rate_limit import EMAIL_LIMIT, limiter
@@ -14,7 +15,7 @@ from app.engine.profiles import PolicyProfile
 from app.engine.scoring import confidence_from_signals, score_from_signals
 from app.engine.checks import _ip_signals, apply_profile
 from app.services.dns_resolver import resolve_mx_hosts, resolve_a
-from app.services.email_smtp import random_user, smtp_rcpt_probe
+from app.services.email_checks import is_role_account, typo_suggestion
 
 
 router = APIRouter()
@@ -29,11 +30,11 @@ async def check_email(
     profile: PolicyProfile = Depends(get_profile),
 ):
     t0 = time.time()
-    settings = request.app.state.settings
     store = request.app.state.store
     index = request.app.state.index
+    verifier = request.app.state.email_verifier
     if index:
-        index.maybe_reload(settings.index_dir)
+        index.maybe_reload(request.app.state.settings.index_dir)
 
     signals: list[Signal] = []
     evidence: list[Evidence] = []
@@ -44,7 +45,9 @@ async def check_email(
         "mx_ips": [],
         "deliverability": "unknown",
         "is_catchall": False,
-        "smtp": {"attempted": False, "code": None, "message": None},
+        "is_role_account": False,
+        "did_you_mean": None,
+        "verifier": {"verifier": "none"},
     }
 
     try:
@@ -56,19 +59,21 @@ async def check_email(
         local = None
 
     if not dom:
+        enrichment["deliverability"] = "undeliverable"
         signals.append(
             Signal(
                 id="email:invalid_syntax",
                 category="syntax",
-                weight=5,
+                weight=50,
                 match=email,
                 source="validator",
-                severity="low",
+                severity="high",
             )
         )
-        evidence.append(Evidence(source="validator", category="syntax", match=email, weight=5))
+        evidence.append(Evidence(source="validator", category="syntax", match=email, weight=50))
     else:
         enrichment["domain"] = dom
+
         # Domain list signals
         for cat in ("disposable", "free_mail"):
             domset = (index.domains or {}).get(cat, set()) if index else set()
@@ -86,13 +91,92 @@ async def check_email(
                 )
                 evidence.append(Evidence(source="domain_list", category=cat, match=dom, weight=w))
 
-        # MX
+        # Role account (info@, support@, ...)
+        if local and is_role_account(local):
+            enrichment["is_role_account"] = True
+            signals.append(
+                Signal(
+                    id="email:role_account",
+                    category="role_account",
+                    weight=5,
+                    match=local,
+                    source="static_list",
+                    severity="low",
+                )
+            )
+            evidence.append(Evidence(source="static_list", category="role_account", match=local, weight=5))
+
+        # Typo detection (gamil.com -> gmail.com), only if the domain isn't
+        # already flagged by a list — no point piling on.
+        listed = any(s.category in ("disposable", "free_mail") for s in signals)
+        if not listed:
+            suggestion = typo_suggestion(dom)
+            if suggestion:
+                enrichment["did_you_mean"] = suggestion
+                signals.append(
+                    Signal(
+                        id="email:domain_typo",
+                        category="typo",
+                        weight=10,
+                        match=f"{dom}~{suggestion}",
+                        source="static_list",
+                        severity="low",
+                    )
+                )
+                evidence.append(
+                    Evidence(
+                        source="static_list",
+                        category="typo",
+                        match=dom,
+                        weight=10,
+                        note=f"did_you_mean:{suggestion}",
+                    )
+                )
+
+        # MX + implicit-MX (A record) checks
         try:
             mx_hosts = resolve_mx_hosts(dom)
         except Exception:
             mx_hosts = []
         enrichment["mx_hosts"] = mx_hosts
 
+        a_records: list[str] = []
+        if not mx_hosts:
+            try:
+                a_records = resolve_a(dom)
+            except Exception:
+                a_records = []
+
+        if not mx_hosts and not a_records:
+            # No MX and no A fallback: mail to this domain cannot be delivered.
+            enrichment["deliverability"] = "undeliverable"
+            signals.append(
+                Signal(
+                    id="email:no_mx",
+                    category="mx",
+                    weight=30,
+                    match=dom,
+                    source="dns",
+                    severity="high",
+                )
+            )
+            evidence.append(Evidence(source="dns", category="mx", match=dom, weight=30))
+        elif not mx_hosts:
+            # RFC 5321 implicit MX via A record — deliverable in theory.
+            enrichment["deliverability"] = "unknown"
+            signals.append(
+                Signal(
+                    id="email:implicit_mx",
+                    category="mx",
+                    weight=5,
+                    match=dom,
+                    source="dns",
+                    severity="low",
+                )
+            )
+            evidence.append(Evidence(source="dns", category="mx", match=dom, weight=5))
+
+        # MX host IPs -> feed reputation
         mx_ips: list[str] = []
         for host in mx_hosts[:5]:
             try:
@@ -106,35 +190,20 @@ async def check_email(
             signals.extend(s)
             evidence.extend(e)
 
-        # Catch-all caching
-        is_catchall_cached = await store.catchall_get(dom)
-        if is_catchall_cached:
+        # Catch-all cache (populated out-of-band)
+        if await store.catchall_get(dom):
             enrichment["is_catchall"] = True
-            enrichment["deliverability"] = "deliverable"
-        else:
-            # SMTP probes (only if we have MX)
-            if mx_hosts and settings.smtp_enabled:
-                mx = mx_hosts[0]
-                fake_rcpt = f"{random_user(10)}@{dom}"
-                probe = smtp_rcpt_probe(settings, mx, fake_rcpt)
-                enrichment["smtp"] = probe.__dict__
-                if probe.code == 250:
+            enrichment["deliverability"] = "catchall"
+
+        # External verifier (opt-in, e.g. Reoon). Overrides DNS heuristics
+        # when it returns a definitive answer.
+        if not isinstance(verifier, NullVerifier):
+            result = await verifier.verify(email)
+            enrichment["verifier"] = result.detail
+            if result.status != "unknown":
+                enrichment["deliverability"] = result.status
+                if result.status == "catchall":
                     enrichment["is_catchall"] = True
-                    enrichment["deliverability"] = "deliverable"
-                    await store.catchall_touch(dom)
-                else:
-                    # Try real recipient
-                    rcpt = f"{local}@{dom}" if local else email
-                    probe2 = smtp_rcpt_probe(settings, mx, rcpt)
-                    enrichment["smtp"] = probe2.__dict__
-                    if probe2.code == 250:
-                        enrichment["deliverability"] = "deliverable"
-                    elif probe2.code is None:
-                        enrichment["deliverability"] = "unknown"
-                    else:
-                        enrichment["deliverability"] = "undeliverable"
-            else:
-                enrichment["deliverability"] = "unknown"
 
     signals, evidence = apply_profile(signals, evidence, profile)
     score = score_from_signals(signals)

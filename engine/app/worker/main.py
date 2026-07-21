@@ -8,6 +8,7 @@ from app.adapters.feeds import download_feed, load_feed_defs
 from app.adapters.index import build_index
 from app.core.config import get_settings
 from app.core.logging import setup_logging
+from app.services.enrichment import ensure_geoip_fresh
 from app.storage.sqlite import SqliteStore
 
 
@@ -37,6 +38,15 @@ async def run() -> None:
                 feed_meta[feed.name] = m
             build_index(index_dir=index_dir, raw_dir=str(raw_dir), feeds=feeds, feed_meta=feed_meta)
             log.info("index_built", extra={"index_dir": index_dir, "feed_count": len(feeds)})
+
+            # Keep the GeoIP database fresh (daily). Only when the geoip
+            # enricher is configured — no point downloading 10 MB otherwise.
+            if settings.enricher == "geoip":
+                await ensure_geoip_fresh(
+                    settings.geoip_mmdb_path,
+                    settings.geoip_url,
+                    max_age_seconds=settings.geoip_max_age_seconds,
+                )
         except Exception as e:
             log.exception("worker_tick_failed")
 

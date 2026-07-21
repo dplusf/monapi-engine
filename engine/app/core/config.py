@@ -20,19 +20,19 @@ class Settings(BaseSettings):
     enricher: str = "null"  # null | geoip
     email_verifier: str = "null"  # null | reoon
 
+    geoip_mmdb_path: str = "/data/geoip/ip66.mmdb"
+    geoip_url: str = "https://downloads.ip66.dev/db/ip66.mmdb"
+    geoip_max_age_seconds: int = 86400
+    rdns_enabled: bool = True
+    rdns_timeout_seconds: float = 2.0
+
+    reoon_api_key: str = ""
+    reoon_mode: str = "quick"  # quick | power
+
     worker_interval_seconds: int = 900
 
     rate_limit_default: str = "60/minute"
     rate_limit_email: str = "10/minute"
-
-    smtp_enabled: bool = True
-    smtp_timeout_seconds: int = 10
-    smtp_helo_host: str = "api.monapi.io"
-    smtp_mail_from: str = "postmaster@monapi.io"
-
-    smtp_socks_enabled: bool = False
-    smtp_proxy_addr: str = ""
-    smtp_proxy_port: int = 1080
 
     log_level: str = "INFO"
 
