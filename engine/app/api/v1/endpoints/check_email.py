@@ -5,12 +5,14 @@ from fastapi import APIRouter, Depends, Request
 
 from email_validator import EmailNotValidError, validate_email
 
+from app.api.deps import get_profile
 from app.core.auth import require_api_key
 from app.core.rate_limit import EMAIL_LIMIT, limiter
 from app.engine.models import Evidence, Signal
 from app.engine.policy import decision_from_score
+from app.engine.profiles import PolicyProfile
 from app.engine.scoring import confidence_from_signals, score_from_signals
-from app.engine.checks import _ip_signals
+from app.engine.checks import _ip_signals, apply_profile
 from app.services.dns_resolver import resolve_mx_hosts, resolve_a
 from app.services.email_smtp import random_user, smtp_rcpt_probe
 
@@ -20,7 +22,12 @@ router = APIRouter()
 
 @router.get("/check/email/{email}")
 @limiter.limit(EMAIL_LIMIT)
-async def check_email(email: str, request: Request, _key: str = Depends(require_api_key)):
+async def check_email(
+    email: str,
+    request: Request,
+    _key: str = Depends(require_api_key),
+    profile: PolicyProfile = Depends(get_profile),
+):
     t0 = time.time()
     settings = request.app.state.settings
     store = request.app.state.store
@@ -129,14 +136,16 @@ async def check_email(email: str, request: Request, _key: str = Depends(require_
             else:
                 enrichment["deliverability"] = "unknown"
 
+    signals, evidence = apply_profile(signals, evidence, profile)
     score = score_from_signals(signals)
     confidence = confidence_from_signals(signals)
-    decision, action = decision_from_score(score)
+    decision, action = decision_from_score(score, profile)
 
     timing_ms = {"total": int((time.time() - t0) * 1000)}
     return {
         "request_id": getattr(request.state, "request_id", ""),
         "ts": int(time.time()),
+        "profile": profile.name,
         "decision": decision,
         "action": action.__dict__ if action else None,
         "score": score,

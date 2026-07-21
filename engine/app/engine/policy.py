@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from app.engine.models import Decision, DecisionAction
+from app.engine.profiles import PolicyProfile, default_profile
 
 
-def decision_from_score(score: int) -> tuple[Decision, DecisionAction | None]:
-    if score >= 80:
+def decision_from_score(
+    score: int, profile: PolicyProfile | None = None
+) -> tuple[Decision, DecisionAction | None]:
+    p = profile or default_profile()
+    if score >= p.block:
         return "block", None
-    if score >= 30:
+    if score >= p.challenge:
         return (
             "challenge",
             DecisionAction(

@@ -3,11 +3,13 @@ from __future__ import annotations
 import time
 from fastapi import APIRouter, Depends, Request
 
+from app.api.deps import get_profile
 from app.core.auth import require_api_key
 from app.engine.models import Evidence, Signal
 from app.engine.policy import decision_from_score
+from app.engine.profiles import PolicyProfile
 from app.engine.scoring import confidence_from_signals, score_from_signals
-from app.engine.checks import _ip_signals
+from app.engine.checks import _ip_signals, apply_profile
 from app.services.dns_resolver import resolve_a, resolve_mx_hosts
 
 
@@ -15,7 +17,12 @@ router = APIRouter()
 
 
 @router.get("/check/domain/{domain}")
-async def check_domain(domain: str, request: Request, _key: str = Depends(require_api_key)):
+async def check_domain(
+    domain: str,
+    request: Request,
+    _key: str = Depends(require_api_key),
+    profile: PolicyProfile = Depends(get_profile),
+):
     t0 = time.time()
     index = request.app.state.index
     if index:
@@ -59,14 +66,16 @@ async def check_domain(domain: str, request: Request, _key: str = Depends(requir
         mx_hosts = []
     enrichment["mx_hosts"] = mx_hosts
 
+    signals, evidence = apply_profile(signals, evidence, profile)
     score = score_from_signals(signals)
     confidence = confidence_from_signals(signals)
-    decision, action = decision_from_score(score)
+    decision, action = decision_from_score(score, profile)
 
     timing_ms = {"total": int((time.time() - t0) * 1000)}
     return {
         "request_id": getattr(request.state, "request_id", ""),
         "ts": int(time.time()),
+        "profile": profile.name,
         "decision": decision,
         "action": action.__dict__ if action else None,
         "score": score,

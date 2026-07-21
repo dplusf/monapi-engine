@@ -9,11 +9,13 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.extension import _rate_limit_exceeded_handler
 
+from app.adapters.base import NullEnricher, NullVerifier
 from app.adapters.index import load_index
 from app.core.auth import bootstrap_api_keys
 from app.core.config import get_settings
 from app.core.logging import RequestIdMiddleware, setup_logging
 from app.core.rate_limit import limiter
+from app.engine.profiles import load_profiles
 from app.storage.sqlite import SqliteStore
 from app.api.v1.router import router as v1_router
 
@@ -30,12 +32,29 @@ async def lifespan(app: FastAPI):
 
     Path(settings.index_dir).mkdir(parents=True, exist_ok=True)
     index = load_index(settings.index_dir)
+    profiles = load_profiles(settings.policies_config)
+
+    # Adapter selection: concrete implementations land in Phase 1b.
+    enricher = NullEnricher()
+    email_verifier = NullVerifier()
 
     app.state.settings = settings
     app.state.store = store
     app.state.index = index
+    app.state.profiles = profiles
+    app.state.enricher = enricher
+    app.state.email_verifier = email_verifier
 
-    log.info("api_ready", extra={"index_dir": settings.index_dir, "sqlite_path": settings.sqlite_path})
+    log.info(
+        "api_ready",
+        extra={
+            "index_dir": settings.index_dir,
+            "sqlite_path": settings.sqlite_path,
+            "profiles": sorted(profiles),
+            "enricher": settings.enricher,
+            "email_verifier": settings.email_verifier,
+        },
+    )
     yield
 
 

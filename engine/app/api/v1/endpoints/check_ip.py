@@ -3,24 +3,32 @@ from __future__ import annotations
 import time
 from fastapi import APIRouter, Depends, Request
 
+from app.api.deps import get_profile
 from app.core.auth import require_api_key
 from app.engine.checks import check_ip
+from app.engine.profiles import PolicyProfile
 
 
 router = APIRouter()
 
 
 @router.get("/check/ip/{ip}")
-async def check_ip_endpoint(ip: str, request: Request, _key: str = Depends(require_api_key)):
+async def check_ip_endpoint(
+    ip: str,
+    request: Request,
+    _key: str = Depends(require_api_key),
+    profile: PolicyProfile = Depends(get_profile),
+):
     t0 = time.time()
     index = request.app.state.index
     if index:
         index.maybe_reload(request.app.state.settings.index_dir)
-    res = check_ip(index, ip)
+    res = check_ip(index, ip, profile)
     timing_ms = {"total": int((time.time() - t0) * 1000)}
     out = {
         "request_id": getattr(request.state, "request_id", ""),
         "ts": int(time.time()),
+        "profile": profile.name,
         "decision": res.decision,
         "action": res.action.__dict__ if res.action else None,
         "score": res.score,

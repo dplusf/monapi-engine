@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     sqlite_path: str = "/data/monapi.sqlite3"
     index_dir: str = "/data/index"
     feeds_config: str = "/app/app/data/feeds.yaml"
+    policies_config: str = "/app/app/data/policies.yaml"
+
+    # Adapter selection (Phase 1b wires concrete implementations).
+    enricher: str = "null"  # null | geoip
+    email_verifier: str = "null"  # null | reoon
 
     worker_interval_seconds: int = 900
 

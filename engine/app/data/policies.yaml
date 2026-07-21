@@ -1,0 +1,16 @@
+# Policy profiles: named variants of thresholds / weight overrides / ignored
+# categories. Selected per request via ?profile=<name>. Unknown profiles are
+# rejected with 400. "default" is required and used when no profile is given.
+#
+# thresholds: score >= block -> "block", score >= challenge -> "challenge"
+# weights:    per-category weight overrides applied at scoring time
+# ignore:     categories that contribute no score and no signals
+profiles:
+  default:
+    thresholds: { challenge: 30, block: 80 }
+  checkout:
+    thresholds: { challenge: 20, block: 60 }
+    weights: { anonymizer: 40 }
+  newsletter:
+    thresholds: { challenge: 50, block: 90 }
+    ignore: [free_mail]
