@@ -1,0 +1,15 @@
+{
+  email {$ACME_EMAIL}
+}
+
+# Configurable host (prod: api.monapi.io, local: localhost)
+{$PUBLIC_HOST} {
+  reverse_proxy api:8000
+  encode gzip
+  header {
+    -Server
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "no-referrer"
+  }
+}

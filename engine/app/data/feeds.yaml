@@ -1,0 +1,44 @@
+# Public sources (no paid services). Keep this list small for MVP.
+feeds:
+  - name: firehol_level1
+    url: https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset
+    type: cidr
+    category: abuse
+    weight: 15
+    format: text
+  - name: firehol_level2
+    url: https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset
+    type: cidr
+    category: abuse
+    weight: 25
+    format: text
+  - name: firehol_level3
+    url: https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level3.netset
+    type: cidr
+    category: abuse
+    weight: 35
+    format: text
+  - name: tor_exits
+    url: https://check.torproject.org/torbulkexitlist
+    type: ip
+    category: anonymizer
+    weight: 25
+    format: text
+  - name: disposable_ivolo
+    url: https://raw.githubusercontent.com/ivolo/disposable-email-domains/master/index.json
+    type: domain
+    category: disposable
+    weight: 40
+    format: json
+  - name: disposable_martenson
+    url: https://raw.githubusercontent.com/disposable-email-domains/disposable-email-domains/master/disposable_email_blocklist.conf
+    type: domain
+    category: disposable
+    weight: 40
+    format: text
+  - name: disposable_wesbos
+    url: https://raw.githubusercontent.com/wesbos/burner-email-providers/master/emails.txt
+    type: domain
+    category: disposable
+    weight: 40
+    format: text

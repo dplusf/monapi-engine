@@ -1,0 +1,74 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: fastapi/Dockerfile
+    container_name: monapi-engine-api
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:-monapi@projektsued.de}
+      PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
+      API_KEY_HEADER: ${API_KEY_HEADER:-X-API-Key}
+      API_KEY_PEPPER: ${API_KEY_PEPPER:-change-me}
+      BOOTSTRAP_API_KEYS: ${BOOTSTRAP_API_KEYS:-dev-key-1,dev-key-2}
+      SQLITE_PATH: ${SQLITE_PATH:-/data/monapi.sqlite3}
+      INDEX_DIR: ${INDEX_DIR:-/data/index}
+      FEEDS_CONFIG: ${FEEDS_CONFIG:-/app/app/data/feeds.yaml}
+      RATE_LIMIT_DEFAULT: ${RATE_LIMIT_DEFAULT:-60/minute}
+      RATE_LIMIT_EMAIL: ${RATE_LIMIT_EMAIL:-10/minute}
+      SMTP_ENABLED: ${SMTP_ENABLED:-true}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
+      SMTP_HELO_HOST: ${SMTP_HELO_HOST:-api.monapi.io}
+      SMTP_MAIL_FROM: ${SMTP_MAIL_FROM:-postmaster@monapi.io}
+      SMTP_SOCKS_ENABLED: ${SMTP_SOCKS_ENABLED:-false}
+      SMTP_PROXY_ADDR: ${SMTP_PROXY_ADDR:-}
+      SMTP_PROXY_PORT: ${SMTP_PROXY_PORT:-1080}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/data
+    ports:
+      - "18000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    build:
+      context: ..
+      dockerfile: fastapi/Dockerfile
+    container_name: monapi-engine-worker
+    command: ["python", "-m", "app.worker"]
+    environment:
+      SQLITE_PATH: ${SQLITE_PATH:-/data/monapi.sqlite3}
+      INDEX_DIR: ${INDEX_DIR:-/data/index}
+      FEEDS_CONFIG: ${FEEDS_CONFIG:-/app/app/data/feeds.yaml}
+      WORKER_INTERVAL_SECONDS: ${WORKER_INTERVAL_SECONDS:-900}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2
+    container_name: monapi-engine-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:-monapi@projektsued.de}
+      PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  caddy_data:
+  caddy_config:
