@@ -12,9 +12,9 @@ no external calls at request time, no data leaving your infrastructure.
 | Directory | Component |
 |---|---|
 | `engine/` | FastAPI decision engine (checks → scoring → policy) + feed sync worker |
-| `bot/` | Telegram bot for quick `/ip` and `/domain` lookups |
 
-The product website and interactive console are maintained separately.
+The product website, interactive console and telegram bot are maintained
+separately.
 
 ## Quick start (engine)
 
