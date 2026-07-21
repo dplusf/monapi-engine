@@ -1,6 +1,6 @@
-# Full stack: engine (api + worker) and site.
-# Production layout: site on :3007, engine on :8007, TLS via Traefik (platform).
-# Configuration comes from .env (see engine/.env.example and site/.env.example).
+# Engine stack: api + worker.
+# Production layout: engine on :8007 behind the platform reverse proxy (Traefik).
+# The product site lives in the separate (private) monapi-site repo.
 
 services:
   api:
@@ -10,7 +10,7 @@ services:
     volumes:
       - engine-data:/data
     ports:
-      - "8007:8000"
+      - "${API_PORT:-8007}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
       interval: 10s
@@ -25,19 +25,6 @@ services:
     env_file: .env
     volumes:
       - engine-data:/data
-    depends_on:
-      api:
-        condition: service_healthy
-    restart: unless-stopped
-
-  site:
-    build: ./site
-    container_name: monapi-site
-    env_file: .env
-    environment:
-      MONAPI_ENGINE_BASE_URL: http://api:8000
-    ports:
-      - "3007:3000"
     depends_on:
       api:
         condition: service_healthy
