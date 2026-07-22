@@ -61,6 +61,13 @@ async def download_feed(
     if meta and meta.get("last_modified"):
         headers["If-Modified-Since"] = meta["last_modified"]
 
+    # Authenticated GitHub requests: 5000/h instead of 60/h. Optional —
+    # the engine works without it but may hit rate limits with many feeds.
+    from app.core.config import get_settings
+    settings = get_settings()
+    if settings.github_token and "raw.githubusercontent.com" in feed.url:
+        headers["Authorization"] = f"Bearer {settings.github_token}"
+
     async with httpx.AsyncClient(follow_redirects=True, timeout=timeout_seconds) as client:
         resp = await client.get(feed.url, headers=headers)
         if resp.status_code == 304 and dest.exists():

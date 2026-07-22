@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     reoon_api_key: str = ""
     reoon_mode: str = "quick"  # quick | power
 
+    # Optional: GitHub token for authenticated raw.githubusercontent.com
+    # requests (5000/h vs 60/h unauthenticated). Leave empty for anonymous.
+    github_token: str = ""
+
     worker_interval_seconds: int = 900
 
     rate_limit_default: str = "60/minute"
