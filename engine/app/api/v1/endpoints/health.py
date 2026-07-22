@@ -54,8 +54,9 @@ async def ready(request: Request):
     stale = False
     if built_at:
         try:
+            import calendar
             parsed = time.strptime(built_at, "%Y-%m-%dT%H:%M:%SZ")
-            age = time.time() - time.mktime(parsed)
+            age = time.time() - calendar.timegm(parsed)
             max_age = int(settings.worker_interval_seconds) * 2 + 300
             stale = age > max_age
         except (ValueError, OSError):
