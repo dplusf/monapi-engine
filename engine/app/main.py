@@ -21,6 +21,8 @@ from app.services.enrichment import GeoIPEnricher
 from app.storage.sqlite import SqliteStore
 from app.api.v1.router import router as v1_router
 
+from prometheus_fastapi_instrumentator import Instrumentator
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -78,3 +80,7 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(RequestIdMiddleware)
 
 app.include_router(v1_router)
+
+# Prometheus metrics on /metrics — HTTP request counts, latencies, status codes.
+# Also exposes 4 custom monapi_index_* gauges updated by /ready.
+Instrumentator().instrument(app).expose(app, include_in_schema=False)
