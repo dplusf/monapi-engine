@@ -1,5 +1,7 @@
-# Public sources (no paid services). Keep this list small for MVP.
+# Public sources (no paid services, no API keys). Weights stack per hit;
+# policy profiles cap and shape the final score.
 feeds:
+  # --- IP/CIDR: abuse reputation ---
   - name: firehol_level1
     url: https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset
     type: cidr
@@ -18,12 +20,78 @@ feeds:
     category: abuse
     weight: 35
     format: text
+  - name: ipsum
+    url: https://raw.githubusercontent.com/stamparm/ipsum/master/ipsum.txt
+    type: ip
+    category: abuse
+    weight: 30
+    format: text
+  - name: spamhaus_drop
+    url: https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/spamhaus_drop.netset
+    type: cidr
+    category: abuse
+    weight: 40
+    format: text
+  - name: blocklist_de
+    url: https://lists.blocklist.de/lists/all.txt
+    type: ip
+    category: abuse
+    weight: 25
+    format: text
+  - name: et_compromised
+    url: https://rules.emergingthreats.net/blockrules/compromised-ips.txt
+    type: ip
+    category: abuse
+    weight: 30
+    format: text
+  - name: binary_defense
+    url: https://www.binarydefense.com/banlist.txt
+    type: ip
+    category: abuse
+    weight: 20
+    format: text
+  - name: ci_army
+    url: http://cinsscore.com/list/ci-badguys.txt
+    type: ip
+    category: abuse
+    weight: 20
+    format: text
+
+  # --- IP/CIDR: anonymizer / infrastructure ---
   - name: tor_exits
     url: https://check.torproject.org/torbulkexitlist
     type: ip
     category: anonymizer
     weight: 25
     format: text
+  - name: x4bnet_vpn
+    url: https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/vpn/ipv4.txt
+    type: cidr
+    category: anonymizer
+    weight: 25
+    format: text
+  - name: x4bnet_datacenter
+    url: https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv4.txt
+    type: cidr
+    category: datacenter
+    weight: 15
+    format: text
+
+  # --- Domains: malware / phishing ---
+  - name: urlhaus_domains
+    url: https://urlhaus.abuse.ch/downloads/hostfile/
+    type: domain
+    category: malware
+    weight: 40
+    format: hostfile
+  - name: phishing_database
+    url: https://raw.githubusercontent.com/mitchellkrogza/Phishing.Database/master/phishing-domains-ACTIVE.txt
+    type: domain
+    category: phishing
+    weight: 35
+    format: text
+
+  # --- Domains: disposable email ---
   - name: disposable_ivolo
     url: https://raw.githubusercontent.com/ivolo/disposable-email-domains/master/index.json
     type: domain

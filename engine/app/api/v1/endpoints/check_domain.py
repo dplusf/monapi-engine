@@ -33,21 +33,21 @@ async def check_domain(
     enrichment = {"domain": domain, "resolved_ips": [], "mx_hosts": []}
 
     dom_lc = domain.strip().lower()
-    for cat in ("disposable", "free_mail"):
-        domset = (index.domains or {}).get(cat, set()) if index else set()
-        if dom_lc in domset:
-            w = 40 if cat == "disposable" else 10
-            signals.append(
-                Signal(
-                    id=f"domain:{cat}",
-                    category=cat,
-                    weight=w,
-                    match=dom_lc,
-                    source="domain_list",
-                    severity="high" if w >= 30 else "low",
-                )
+    hits = (index.domains or {}).get(dom_lc, {}) if index else {}
+    for cat, info in hits.items():
+        w = int(info.get("weight", 10))
+        src = ",".join(info.get("feeds", ["domain_list"]))
+        signals.append(
+            Signal(
+                id=f"domain:{cat}",
+                category=cat,
+                weight=w,
+                match=dom_lc,
+                source=src,
+                severity="high" if w >= 30 else "low",
             )
-            evidence.append(Evidence(source="domain_list", category=cat, match=dom_lc, weight=w))
+        )
+        evidence.append(Evidence(source=src, category=cat, match=dom_lc, weight=w))
 
     try:
         ips = resolve_a(dom_lc)

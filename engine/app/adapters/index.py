@@ -12,14 +12,17 @@ from typing import Any
 
 import pytricia
 
-from app.adapters.feeds import FeedDef
+from app.adapters.feeds import FeedDef, feed_suffix
 
 
 @dataclass
 class IndexStore:
     ip_trie: pytricia.PyTricia  # IPv4, 32 bits
     ip6_trie: pytricia.PyTricia  # IPv6, 128 bits
-    domains: dict[str, set[str]]
+    # domain -> category -> {"weight": int, "feeds": [names]}.
+    # One hit per category regardless of how many feeds list the domain;
+    # weight is the max feed weight of that category.
+    domains: dict[str, dict[str, dict[str, Any]]]
     meta: dict[str, Any]
     meta_path: Path
 
@@ -63,6 +66,16 @@ def _parse_domain_file(path: Path, fmt: str) -> set[str]:
         if isinstance(data, list):
             return {str(x).strip().lower() for x in data if str(x).strip()}
         return set()
+    if fmt == "hostfile":
+        # "127.0.0.1 domain.tld" style (e.g. URLhaus hostfile export)
+        out: set[str] = set()
+        for line in _load_text_lines(path):
+            parts = line.split()
+            if len(parts) >= 2:
+                dom = parts[-1].strip().lower()
+                if dom and dom not in ("localhost", "localhost.localdomain"):
+                    out.add(dom)
+        return out
     return {line.strip().lower() for line in _load_text_lines(path)}
 
 
@@ -90,12 +103,11 @@ def build_index(
 
     trie4 = pytricia.PyTricia(32)
     trie6 = pytricia.PyTricia(128)
-    domains: dict[str, set[str]] = {}
+    domains: dict[str, dict[str, dict[str, Any]]] = {}
 
     for feed in feeds:
         if feed.type in ("ip", "cidr"):
-            suffix = ".json" if feed.format == "json" else ".txt"
-            f = raw_path / f"{feed.name}{suffix}"
+            f = raw_path / f"{feed.name}{feed_suffix(feed.format)}"
             if not f.exists():
                 continue
             entries = _parse_ip_cidr_file(f)
@@ -128,11 +140,18 @@ def build_index(
                     trie[cidr] = [meta_item]
 
         elif feed.type == "domain":
-            suffix = ".json" if feed.format == "json" else ".txt"
-            f = raw_path / f"{feed.name}{suffix}"
+            f = raw_path / f"{feed.name}{feed_suffix(feed.format)}"
             if not f.exists():
                 continue
-            domains.setdefault(feed.category, set()).update(_parse_domain_file(f, feed.format))
+            for dom in _parse_domain_file(f, feed.format):
+                cats = domains.setdefault(dom, {})
+                entry = cats.get(feed.category)
+                if entry is None:
+                    cats[feed.category] = {"weight": int(feed.weight), "feeds": [feed.name]}
+                else:
+                    entry["weight"] = max(entry["weight"], int(feed.weight))
+                    if feed.name not in entry["feeds"]:
+                        entry["feeds"].append(feed.name)
 
     # Required by pytricia before pickling.
     trie4.freeze()
@@ -169,7 +188,7 @@ def load_index(index_dir: str) -> IndexStore:
 
     trie4 = pytricia.PyTricia(32)
     trie6 = pytricia.PyTricia(128)
-    domains: dict[str, set[str]] = {}
+    domains: dict[str, dict[str, dict[str, Any]]] = {}
     meta: dict[str, Any] = {}
 
     if ip_file.exists():

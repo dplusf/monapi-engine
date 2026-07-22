@@ -19,7 +19,11 @@ class FeedDef:
     type: str  # ip|cidr|domain
     category: str
     weight: int
-    format: str  # text|json
+    format: str  # text|json|hostfile
+
+
+def feed_suffix(fmt: str) -> str:
+    return {"json": ".json", "hostfile": ".hosts"}.get(fmt, ".txt")
 
 
 def load_feed_defs(path: str) -> list[FeedDef]:
@@ -48,8 +52,7 @@ async def download_feed(
     timeout_seconds: int = 30,
 ) -> Path:
     raw_dir.mkdir(parents=True, exist_ok=True)
-    suffix = ".json" if feed.format == "json" else ".txt"
-    dest = raw_dir / f"{feed.name}{suffix}"
+    dest = raw_dir / f"{feed.name}{feed_suffix(feed.format)}"
 
     meta = await store.get_feed_meta(feed.name)
     headers: dict[str, str] = {}

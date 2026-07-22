@@ -74,22 +74,22 @@ async def check_email(
     else:
         enrichment["domain"] = dom
 
-        # Domain list signals
-        for cat in ("disposable", "free_mail"):
-            domset = (index.domains or {}).get(cat, set()) if index else set()
-            if dom in domset:
-                w = 40 if cat == "disposable" else 10
-                signals.append(
-                    Signal(
-                        id=f"email_domain:{cat}",
-                        category=cat,
-                        weight=w,
-                        match=dom,
-                        source="domain_list",
-                        severity="high" if w >= 30 else "low",
-                    )
+        # Domain list signals (all categories: disposable, phishing, malware, ...)
+        hits = (index.domains or {}).get(dom, {}) if index else {}
+        for cat, info in hits.items():
+            w = int(info.get("weight", 10))
+            src = ",".join(info.get("feeds", ["domain_list"]))
+            signals.append(
+                Signal(
+                    id=f"email_domain:{cat}",
+                    category=cat,
+                    weight=w,
+                    match=dom,
+                    source=src,
+                    severity="high" if w >= 30 else "low",
                 )
-                evidence.append(Evidence(source="domain_list", category=cat, match=dom, weight=w))
+            )
+            evidence.append(Evidence(source=src, category=cat, match=dom, weight=w))
 
         # Role account (info@, support@, ...)
         if local and is_role_account(local):
@@ -107,9 +107,8 @@ async def check_email(
             evidence.append(Evidence(source="static_list", category="role_account", match=local, weight=5))
 
         # Typo detection (gamil.com -> gmail.com), only if the domain isn't
-        # already flagged by a list — no point piling on.
-        listed = any(s.category in ("disposable", "free_mail") for s in signals)
-        if not listed:
+        # already flagged by any list — no point piling on.
+        if not hits:
             suggestion = typo_suggestion(dom)
             if suggestion:
                 enrichment["did_you_mean"] = suggestion
