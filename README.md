@@ -1,5 +1,7 @@
 # monapi
 
+[![CI](https://github.com/dplusf/monapi-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/dplusf/monapi-engine/actions/workflows/ci.yml)
+
 Self-hosted request-time decision API for abuse prevention.
 
 Given an IP address, domain, or email, monapi returns a decision
