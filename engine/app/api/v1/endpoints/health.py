@@ -5,7 +5,6 @@ import time
 from fastapi import APIRouter, Request
 
 from app.core.rate_limit import limiter
-from app.core.metrics import index_gauge_v4, index_gauge_v6, index_gauge_domains, index_gauge_stale
 
 
 router = APIRouter()
@@ -70,12 +69,6 @@ async def ready(request: Request):
         status = "degraded"
     else:
         status = "ok"
-
-    # Update Prometheus custom gauges.
-    index_gauge_v4.set(entries_v4)
-    index_gauge_v6.set(entries_v6)
-    index_gauge_domains.set(domains)
-    index_gauge_stale.set(1 if stale else 0)
 
     return {
         "status": status,
