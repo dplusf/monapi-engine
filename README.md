@@ -14,6 +14,9 @@ no external calls at request time, no data leaving your infrastructure.
 | Directory | Component |
 |---|---|
 | `engine/` | FastAPI decision engine (checks → scoring → policy) + feed sync worker |
+| `mcp/` | MCP server — the same decisions as a tool for agents |
+| `clients/node/` | `@monapi/client` — TypeScript client, fail-open |
+| `docs/` | [Signal reference](docs/signals.md): what every signal id means |
 
 The product website, interactive console and telegram bot are maintained
 separately.
@@ -36,6 +39,37 @@ an in-memory trie index (IPv4 + IPv6). API keys are bootstrapped via
 categories) are defined in `engine/app/data/policies.yaml` and selected per
 request with `?profile=<name>`. Optional Geo/ASN/rDNS enrichment via
 `ENRICHER=geoip` (local MMDB, no account required).
+
+## Endpoints
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET /health` | no | Liveness |
+| `GET /ready` | no | Readiness: database, index size, feed age |
+| `GET /v1/check/ip/{ip}` | yes | IP reputation |
+| `GET /v1/check/domain/{domain}` | yes | Domain reputation |
+| `GET /v1/check/email/{email}` | yes | Email validation + reputation |
+| `GET /v1/signals` | yes | Signal catalogue — every id this instance can emit |
+| `GET /v1/profiles` | yes | Policy profiles and what each one changes |
+
+Checks take `?profile=<name>`. Every response carries `decision`, `score`,
+`confidence`, `signals`, `evidence` and `enrichment`; the
+[signal reference](docs/signals.md) explains what the ids mean and when
+they mislead.
+
+## Using it
+
+```ts
+// TypeScript / Next.js — npm install @monapi/client
+import { checkEmail } from "@monapi/client";
+const { decision, score, signals } = await checkEmail("kontakt@gamil.com");
+```
+
+```bash
+# From an agent — see mcp/README.md
+claude mcp add monapi --env MONAPI_API_KEY=dev-key-1 \
+  -- uv run --directory ./mcp monapi-mcp
+```
 
 ## Status
 
