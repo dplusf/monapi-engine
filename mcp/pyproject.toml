@@ -4,12 +4,19 @@ version = "0.1.0"
 description = "MCP server for monapi — allow/challenge/block decisions for emails, IPs and domains"
 readme = "README.md"
 license = { text = "MIT" }
+authors = [{ name = "Projektsued GmbH", email = "info@projektsued.de" }]
+keywords = ["mcp", "abuse", "disposable-email", "self-hosted", "monapi"]
 requires-python = ">=3.11"
 dependencies = [
     "mcp>=2.0.0",
     "httpx>=0.27.0",
     "pydantic>=2.9.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/dplusf/monapi-engine"
+Source = "https://github.com/dplusf/monapi-engine/tree/main/mcp"
+Agency = "https://projektsued.de"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.24"]

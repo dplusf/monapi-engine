@@ -130,6 +130,14 @@ of evidence, not a clean bill of health.
 Types: `CheckResult`, `Decision`, `Signal`, `Enrichment`,
 `DecisionAction`, `MonapiOptions`, `Deliverability`.
 
+## Who builds this
+
+monapi is built and operated by [Projektsued GmbH](https://projektsued.de),
+a technical agency in Kirchheim near Munich. We use it in our own shops —
+the disposable-address and form-spam problems it solves are ones we have
+in production. If you need something like this built or integrated:
+[projektsued.de](https://projektsued.de) · info@projektsued.de
+
 ## Development
 
 ```bash

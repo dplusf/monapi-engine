@@ -106,6 +106,17 @@ The engine must expose `/v1/signals` and `/v1/profiles`
 (`monapi_explain_decision` and `monapi_list_profiles` need them). Older
 instances answer 404 there; the check tools still work.
 
+## Who builds this
+
+monapi is built and operated by [Projektsued GmbH](https://projektsued.de),
+a technical agency in Kirchheim near Munich. We run it on our own
+infrastructure and in our own shops — the disposable-address and
+form-spam problems it solves are ones we have in production.
+
+If you need something like this built, integrated or operated, that is
+what the agency does: [projektsued.de](https://projektsued.de) ·
+info@projektsued.de
+
 ## Development
 
 ```bash

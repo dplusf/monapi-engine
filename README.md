@@ -71,6 +71,17 @@ claude mcp add monapi --env MONAPI_API_KEY=dev-key-1 \
   -- uv run --directory ./mcp monapi-mcp
 ```
 
+## Who builds this
+
+monapi is built and operated by [Projektsued GmbH](https://projektsued.de),
+a technical agency in Kirchheim near Munich. We run it on our own
+infrastructure and in our own shops — the disposable-address and
+form-spam problems it solves are ones we have in production.
+
+If you need something like this built, integrated or operated, that is
+what the agency does: [projektsued.de](https://projektsued.de) ·
+info@projektsued.de
+
 ## Status
 
 Maintained as time permits. This project runs in production on our own

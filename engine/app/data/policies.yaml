@@ -14,3 +14,17 @@ profiles:
   newsletter:
     thresholds: { challenge: 50, block: 90 }
     ignore: [free_mail]
+  # Something of value given away against a form — a sample, a free
+  # shipment, a download.
+  #
+  # free_mail 30: a free mailbox is not abuse, but it is the cheapest way
+  # to claim twice, so it earns a challenge on its own rather than being
+  # waved through or blocked.
+  #
+  # disposable 80: nobody has a legitimate reason to receive a sample at a
+  # ten-minute address. The asymmetry justifies the hard line — a false
+  # block costs an interested person one retry with a real address, a
+  # false allow costs the goods.
+  lead:
+    thresholds: { challenge: 30, block: 80 }
+    weights: { free_mail: 30, disposable: 80 }
