@@ -13,7 +13,7 @@ from app.engine.models import Evidence, Signal
 from app.engine.policy import decision_from_score
 from app.engine.profiles import PolicyProfile
 from app.engine.scoring import confidence_from_signals, score_from_signals
-from app.engine.checks import _ip_signals, apply_profile
+from app.engine.checks import _ip_signals, apply_profile, dedupe_host_signals
 from app.services.dns_resolver import resolve_mx_hosts, resolve_a
 from app.services.email_checks import is_role_account, typo_suggestion
 
@@ -184,10 +184,21 @@ async def check_email(
                 continue
         enrichment["mx_ips"] = mx_ips
 
+        # Reputation of the mail servers, as one finding per feed rather
+        # than one per host. `datacenter` is dropped outright here: every
+        # mail server worth its name lives in a datacenter, so the hit
+        # says nothing about this address.
+        mx_signals: list[Signal] = []
+        mx_evidence: list[Evidence] = []
         for ip in mx_ips:
             s, e = _ip_signals(index, ip)
-            signals.extend(s)
-            evidence.extend(e)
+            mx_signals.extend(s)
+            mx_evidence.extend(e)
+        mx_signals, mx_evidence = dedupe_host_signals(
+            mx_signals, mx_evidence, drop_categories=frozenset({"datacenter"})
+        )
+        signals.extend(mx_signals)
+        evidence.extend(mx_evidence)
 
         # Catch-all cache (populated out-of-band)
         if await store.catchall_get(dom):

@@ -46,7 +46,7 @@ Two rules for consuming signals in code:
 | `typo` | 10 | One edit away from a large mailbox provider. |
 | `abuse` | 15-40 | IP listed for attacks, spam or compromise by a public feed. |
 | `anonymizer` | 25 | Tor exit node or commercial VPN egress. |
-| `datacenter` | 15 | Hosting/cloud range — no residential user behind it. |
+| `datacenter` | 15 | Hosting/cloud range — no residential user behind it. Never emitted for the mail servers of an email check: every mail server worth its name lives in a datacenter, so the hit carries no information there. |
 | `free_mail` | 10 | Free mailbox provider (gmail.com, gmx.de, mail.ru). Not abuse, an attribute of the address: the sender has no domain of their own. Weight is low on purpose — a B2B lead form cares, a newsletter signup does not, and the profile decides. Paid privacy providers (posteo.de, mailbox.org) are deliberately absent from the source list; proton.me is missing although its free tier would qualify. |
 
 ## Signals
@@ -130,9 +130,9 @@ Examples: `feed:firehol_level2:0`, `feed:tor_exits:0`, `feed:spamhaus_drop:1`
 
 The IP falls inside a range listed by that feed. `<n>` is the index of the match when several ranges cover the same address — it is a disambiguator, not a rank. On the domain check the IP is a resolved A record; on the email check it is an IP of one of the first five MX hosts.
 
-**What to do with it.** Match on the feed name and the category, never on the full id — the index shifts when feeds change. Weights stack: two feeds listing the same IP add up, which is how a well-known bad host reaches block range without any single feed being decisive.
+**What to do with it.** Match on the feed name and the category, never on the full id — the index shifts when feeds change. Weights stack across feeds: two feeds listing the same IP add up, which is how a well-known bad host reaches block range without any single feed being decisive. They do not stack across hosts: when a domain resolves to several addresses, or has several mail servers, one feed contributes once. A provider running five mail servers is not five times as suspicious.
 
-**When it is wrong.** Large NAT ranges and shared hosting mean a listed IP is not necessarily the visitor. anonymizer is a policy question, not an abuse finding: VPN users are ordinary customers in Europe. datacenter on an MX host is expected and meaningless — mail servers live in datacenters.
+**When it is wrong.** Large NAT ranges and shared hosting mean a listed IP is not necessarily the visitor. anonymizer is a policy question, not an abuse finding: VPN users are ordinary customers in Europe. On the email check, the IPs belong to the domain's mail servers and not to whoever is filling in your form — a shared provider can be listed for something another customer did.
 
 ## Reading the rest of the response
 

@@ -9,7 +9,7 @@ from app.engine.models import Evidence, Signal
 from app.engine.policy import decision_from_score
 from app.engine.profiles import PolicyProfile
 from app.engine.scoring import confidence_from_signals, score_from_signals
-from app.engine.checks import _ip_signals, apply_profile
+from app.engine.checks import _ip_signals, apply_profile, dedupe_host_signals
 from app.services.dns_resolver import resolve_a, resolve_mx_hosts
 
 
@@ -55,10 +55,18 @@ async def check_domain(
         ips = []
     enrichment["resolved_ips"] = ips
 
+    # One finding per feed across all A records — a site on five IPs in
+    # one listed range is one fact. Unlike the email check, datacenter is
+    # kept: where a website is hosted is information.
+    ip_signals: list[Signal] = []
+    ip_evidence: list[Evidence] = []
     for ip in ips:
         s, e = _ip_signals(index, ip)
-        signals.extend(s)
-        evidence.extend(e)
+        ip_signals.extend(s)
+        ip_evidence.extend(e)
+    ip_signals, ip_evidence = dedupe_host_signals(ip_signals, ip_evidence)
+    signals.extend(ip_signals)
+    evidence.extend(ip_evidence)
 
     # Geo/ASN enrichment per resolved IP (only entries with data).
     enricher = request.app.state.enricher

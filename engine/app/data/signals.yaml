@@ -53,7 +53,10 @@ categories:
     summary: Tor exit node or commercial VPN egress.
     default_weight: 25
   datacenter:
-    summary: Hosting/cloud range — no residential user behind it.
+    summary: >-
+      Hosting/cloud range — no residential user behind it. Never emitted
+      for the mail servers of an email check: every mail server worth its
+      name lives in a datacenter, so the hit carries no information there.
     default_weight: 15
   free_mail:
     summary: >-
@@ -211,12 +214,16 @@ signals:
       hosts.
     guidance: >-
       Match on the feed name and the category, never on the full id — the
-      index shifts when feeds change. Weights stack: two feeds listing the
-      same IP add up, which is how a well-known bad host reaches block
-      range without any single feed being decisive.
+      index shifts when feeds change. Weights stack across feeds: two
+      feeds listing the same IP add up, which is how a well-known bad host
+      reaches block range without any single feed being decisive. They do
+      not stack across hosts: when a domain resolves to several addresses,
+      or has several mail servers, one feed contributes once. A provider
+      running five mail servers is not five times as suspicious.
     false_positives: >-
       Large NAT ranges and shared hosting mean a listed IP is not
       necessarily the visitor. anonymizer is a policy question, not an
-      abuse finding: VPN users are ordinary customers in Europe. datacenter
-      on an MX host is expected and meaningless — mail servers live in
-      datacenters.
+      abuse finding: VPN users are ordinary customers in Europe. On the
+      email check, the IPs belong to the domain's mail servers and not to
+      whoever is filling in your form — a shared provider can be listed
+      for something another customer did.

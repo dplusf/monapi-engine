@@ -51,6 +51,38 @@ def _ip_signals(index: IndexStore, ip: str) -> tuple[list[Signal], list[Evidence
     return signals, evidence
 
 
+def dedupe_host_signals(
+    signals: list[Signal],
+    evidence: list[Evidence],
+    drop_categories: frozenset[str] = frozenset(),
+) -> tuple[list[Signal], list[Evidence]]:
+    """Collapse per-host findings into one per (source, category).
+
+    A domain whose five mail servers all sit in the same listed range is
+    one finding, not five. Without this the weight of a single fact
+    scales with how many hosts a provider happens to run — which is how
+    gmail.com reached block range on datacenter hits alone.
+
+    `drop_categories` removes findings that carry no information in this
+    position at all.
+    """
+    out_signals: list[Signal] = []
+    out_evidence: list[Evidence] = []
+    seen: set[tuple[str, str]] = set()
+
+    for signal, ev in zip(signals, evidence):
+        if signal.category in drop_categories:
+            continue
+        key = (signal.source, signal.category)
+        if key in seen:
+            continue
+        seen.add(key)
+        out_signals.append(signal)
+        out_evidence.append(ev)
+
+    return out_signals, out_evidence
+
+
 def apply_profile(
     signals: list[Signal], evidence: list[Evidence], profile: PolicyProfile | None = None
 ) -> tuple[list[Signal], list[Evidence]]:
