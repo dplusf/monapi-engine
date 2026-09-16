@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     index_dir: str = "/data/index"
     feeds_config: str = "/app/app/data/feeds.yaml"
     policies_config: str = "/app/app/data/policies.yaml"
+    signals_config: str = "/app/app/data/signals.yaml"
 
     # Adapter selection (Phase 1b wires concrete implementations).
     enricher: str = "null"  # null | geoip

@@ -17,6 +17,7 @@ from app.core.config import get_settings
 from app.core.logging import RequestIdMiddleware, setup_logging
 from app.core.rate_limit import limiter
 from app.engine.profiles import load_profiles
+from app.engine.signals import load_catalogue
 from app.services.enrichment import GeoIPEnricher
 from app.storage.sqlite import SqliteStore
 from app.api.v1.router import router as v1_router
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
     Path(settings.index_dir).mkdir(parents=True, exist_ok=True)
     index = load_index(settings.index_dir)
     profiles = load_profiles(settings.policies_config)
+    signals = load_catalogue(settings.signals_config)
 
     # Adapter selection.
     if settings.enricher == "geoip":
@@ -56,6 +58,7 @@ async def lifespan(app: FastAPI):
     app.state.store = store
     app.state.index = index
     app.state.profiles = profiles
+    app.state.signals = signals
     app.state.enricher = enricher
     app.state.email_verifier = email_verifier
 

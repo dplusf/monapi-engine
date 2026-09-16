@@ -25,6 +25,25 @@ curl -H "X-API-Key: dev-key-1" "http://localhost:18000/v1/check/ip/1.1.1.1?profi
 Named variants of thresholds / weight overrides / ignored categories, defined
 in `app/data/policies.yaml`, selected per request via `?profile=<name>`.
 Unknown profiles return 400 with the list of available profiles.
+`GET /v1/profiles` lists what this instance offers.
+
+## Signals
+
+Every check returns `signals` — one entry per finding, with the weight it
+contributed. What the ids mean, and when they mislead, is in
+[`docs/signals.md`](../docs/signals.md), generated from
+`app/data/signals.yaml` and served as JSON by `GET /v1/signals`.
+
+The catalogue is the single source of truth: add a signal to the YAML in
+the same commit that emits it, then regenerate the docs.
+
+```bash
+python scripts/gen_signal_docs.py          # rewrite ../docs/signals.md
+python scripts/gen_signal_docs.py --check  # CI: fail if stale
+```
+
+`tests/test_signals.py` fails if the code emits an id the catalogue does
+not document, or a profile references a category nobody defined.
 
 ## Enrichment
 

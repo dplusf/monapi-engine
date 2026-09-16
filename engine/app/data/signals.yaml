@@ -1,0 +1,221 @@
+# Canonical signal catalogue.
+#
+# Every signal the engine can emit is described here exactly once. This file
+# is the single source of truth for three consumers:
+#
+#   * GET /v1/signals          — machine-readable, for clients and agents
+#   * docs/signals.md          — generated, never edited by hand
+#   * the MCP server's explain_decision tool
+#
+# When a check starts emitting a new signal id, add it here in the same
+# commit. tests/test_signals.py fails if an id emitted by the code is
+# missing from this catalogue.
+#
+# Fields per signal:
+#   id / id_pattern  exact id, or the shape of a family of ids
+#   category         what the signal is about; profiles override weights
+#                    and ignore signals by category, never by id
+#   weight           default score contribution (0-100, additive, capped)
+#   severity         how the engine labels it: low | medium | high
+#   source           where the fact came from
+#   endpoints        which checks can emit it
+#   meaning          what is actually true when this fires
+#   guidance         what to do with it
+#   false_positives  when it fires and the address/host is still fine
+version: 1
+
+categories:
+  syntax:
+    summary: The address is not a valid mailbox address at all.
+    default_weight: 50
+  disposable:
+    summary: Throwaway mailbox provider (10 minute mail and friends).
+    default_weight: 40
+  phishing:
+    summary: Domain listed as actively used for phishing.
+    default_weight: 35
+  malware:
+    summary: Domain listed as distributing malware.
+    default_weight: 40
+  mx:
+    summary: Mail routing of the domain — can mail be delivered at all.
+    default_weight: 30
+  role_account:
+    summary: Shared mailbox (info@, support@) rather than a person.
+    default_weight: 5
+  typo:
+    summary: One edit away from a large mailbox provider.
+    default_weight: 10
+  abuse:
+    summary: IP listed for attacks, spam or compromise by a public feed.
+    default_weight: 15-40
+  anonymizer:
+    summary: Tor exit node or commercial VPN egress.
+    default_weight: 25
+  datacenter:
+    summary: Hosting/cloud range — no residential user behind it.
+    default_weight: 15
+  free_mail:
+    summary: >-
+      Large free mailbox provider (gmail.com, gmx.de). No feed currently
+      populates this category, so no signal is emitted for it today; the
+      category exists because the newsletter profile ignores it and
+      profiles may override it once a source is wired.
+    default_weight: 10
+    emitted: false
+
+signals:
+  # ---- email syntax -------------------------------------------------------
+  - id: "email:invalid_syntax"
+    category: syntax
+    weight: 50
+    severity: high
+    source: validator
+    endpoints: ["/v1/check/email"]
+    meaning: >-
+      The string is not a syntactically valid email address (RFC 5322 via
+      the email-validator library). Deliverability is reported as
+      undeliverable without any DNS lookup.
+    guidance: >-
+      Reject at the form level and show a correction hint. Nothing else in
+      the response is meaningful — no domain was parsed.
+    false_positives: >-
+      Unusual but legal local parts (quoted strings, unicode) are accepted
+      by the validator, so a rejection here is rarely wrong.
+
+  # ---- email domain reputation -------------------------------------------
+  - id_pattern: "email_domain:<category>"
+    examples:
+      ["email_domain:disposable", "email_domain:phishing", "email_domain:malware"]
+    category: "<from the feed that listed the domain>"
+    weight: "feed weight (disposable 40, malware 40, phishing 35)"
+    severity: "high if weight >= 30, else low"
+    source: "comma-separated feed names that listed the domain"
+    endpoints: ["/v1/check/email"]
+    meaning: >-
+      The email's domain appears on one or more domain blocklists. One
+      signal per category, never one per feed; the weight is the highest
+      weight among the feeds of that category that listed it, and `source`
+      names all of them.
+    guidance: >-
+      disposable is the usual reason to challenge a signup; malware and
+      phishing on a sender domain are strong block reasons. The feed names
+      in `source` are what you cite when a user disputes the decision.
+    false_positives: >-
+      Disposable lists are broad and include some legitimate privacy
+      forwarders (e.g. relay services). Phishing lists can carry a
+      compromised domain for a while after cleanup.
+
+  - id_pattern: "domain:<category>"
+    examples: ["domain:phishing", "domain:malware", "domain:disposable"]
+    category: "<from the feed that listed the domain>"
+    weight: "feed weight (see above)"
+    severity: "high if weight >= 30, else low"
+    source: "comma-separated feed names"
+    endpoints: ["/v1/check/domain"]
+    meaning: >-
+      Same lookup as email_domain, emitted by the domain check. The
+      different prefix exists so a caller can tell which check produced
+      the signal when results are stored side by side.
+    guidance: >-
+      Use for link/referrer/website checks. Identical semantics to
+      email_domain of the same category.
+    false_positives: Same as email_domain.
+
+  # ---- email mailbox shape ------------------------------------------------
+  - id: "email:role_account"
+    category: role_account
+    weight: 5
+    severity: low
+    source: static_list
+    endpoints: ["/v1/check/email"]
+    meaning: >-
+      The local part is a shared mailbox name (info, support, kontakt,
+      sales, …). Not abuse — an attribute of the address.
+    guidance: >-
+      Useful for B2B lead quality, not for blocking. Weight is deliberately
+      small; raise it via a profile weight override if role addresses are
+      worthless to you, or ignore the category entirely for contact forms.
+    false_positives: >-
+      Legitimate in B2B: a purchasing department writing from
+      einkauf@ is normal.
+
+  - id: "email:domain_typo"
+    category: typo
+    weight: 10
+    severity: low
+    source: static_list
+    endpoints: ["/v1/check/email"]
+    meaning: >-
+      The domain is one edit (insert, delete, substitute, adjacent
+      transposition) away from a popular mailbox provider — gamil.com,
+      gmial.com, web.d. Only checked when no blocklist already flagged the
+      domain. The suggestion is in enrichment.did_you_mean.
+    guidance: >-
+      Do not block on this. Show "did you mean gmail.com?" in the form —
+      this is the signal that recovers real customers who mistyped.
+    false_positives: >-
+      A real, small domain that happens to be one edit from a large
+      provider (e.g. gmx.at vs gmx.de) will be flagged.
+
+  # ---- email mail routing -------------------------------------------------
+  - id: "email:no_mx"
+    category: mx
+    weight: 30
+    severity: high
+    source: dns
+    endpoints: ["/v1/check/email"]
+    meaning: >-
+      The domain has neither MX records nor an A record fallback. Mail to
+      this address cannot be delivered by anyone. Deliverability is set to
+      undeliverable.
+    guidance: >-
+      The strongest cheap signal for a fake address. Worth a challenge on
+      its own at the default threshold; combine with anything else and it
+      blocks.
+    false_positives: >-
+      Transient DNS failures look identical to a missing MX. A resolver
+      timeout on a busy domain will fire this once and not again — do not
+      persist the verdict, re-check.
+
+  - id: "email:implicit_mx"
+    category: mx
+    weight: 5
+    severity: low
+    source: dns
+    endpoints: ["/v1/check/email"]
+    meaning: >-
+      No MX record, but an A record exists. RFC 5321 says mail may be
+      delivered to the A record host, so this is deliverable in theory but
+      unusual for a domain that accepts mail in practice.
+    guidance: >-
+      A weak hint, not a reason to act alone. Common for small self-hosted
+      domains.
+    false_positives: Legitimate single-host mail setups.
+
+  # ---- IP reputation ------------------------------------------------------
+  - id_pattern: "feed:<feed_name>:<n>"
+    examples: ["feed:firehol_level2:0", "feed:tor_exits:0", "feed:spamhaus_drop:1"]
+    category: "abuse | anonymizer | datacenter (from feeds.yaml)"
+    weight: "the feed's weight in feeds.yaml (15-40)"
+    severity: "high if weight >= 30, else medium"
+    source: "<feed_name>"
+    endpoints:
+      ["/v1/check/ip", "/v1/check/domain", "/v1/check/email"]
+    meaning: >-
+      The IP falls inside a range listed by that feed. `<n>` is the index
+      of the match when several ranges cover the same address — it is a
+      disambiguator, not a rank. On the domain check the IP is a resolved
+      A record; on the email check it is an IP of one of the first five MX
+      hosts.
+    guidance: >-
+      Match on the feed name and the category, never on the full id — the
+      index shifts when feeds change. Weights stack: two feeds listing the
+      same IP add up, which is how a well-known bad host reaches block
+      range without any single feed being decisive.
+    false_positives: >-
+      Large NAT ranges and shared hosting mean a listed IP is not
+      necessarily the visitor. anonymizer is a policy question, not an
+      abuse finding: VPN users are ordinary customers in Europe. datacenter
+      on an MX host is expected and meaningless — mail servers live in
+      datacenters.
