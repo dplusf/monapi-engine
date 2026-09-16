@@ -1,0 +1,40 @@
+{
+  "name": "@monapi/client",
+  "version": "0.1.0",
+  "description": "Client for a monapi engine — allow/challenge/block decisions for emails, IPs and domains. Fail-open by default.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dplusf/monapi-engine.git",
+    "directory": "clients/node"
+  },
+  "homepage": "https://github.com/dplusf/monapi-engine/tree/main/clients/node",
+  "keywords": [
+    "abuse",
+    "disposable-email",
+    "email-validation",
+    "bot-detection",
+    "self-hosted",
+    "monapi"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}
