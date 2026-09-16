@@ -1,7 +1,7 @@
 {
   "name": "@monapi/client",
   "version": "0.1.0",
-  "description": "Client for a monapi engine — allow/challenge/block decisions for emails, IPs and domains. Fail-open by default.",
+  "description": "Client for a monapi engine \u2014 allow/challenge/block decisions for emails, IPs and domains. Fail-open by default.",
   "license": "MIT",
   "author": "Projektsued GmbH <info@projektsued.de> (https://projektsued.de)",
   "repository": {
@@ -27,8 +27,14 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md"],
-  "engines": { "node": ">=18" },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc",
     "test": "node --test --experimental-strip-types tests/*.test.ts",

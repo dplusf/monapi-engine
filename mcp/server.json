@@ -1,0 +1,48 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.dplusf/monapi",
+  "title": "monapi",
+  "description": "Allow, challenge or block an email, IP or domain — with the signals behind the verdict",
+  "repository": {
+    "url": "https://github.com/dplusf/monapi-engine",
+    "source": "github",
+    "subfolder": "mcp"
+  },
+  "version": "0.1.0",
+  "websiteUrl": "https://www.monapi.io",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "monapi-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "MONAPI_API_KEY",
+          "description": "API key the engine accepts. On a self-hosted instance these come from BOOTSTRAP_API_KEYS.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "MONAPI_URL",
+          "description": "Base URL of the monapi engine. Point this at your own instance.",
+          "default": "https://api.monapi.io"
+        },
+        {
+          "name": "MONAPI_PROFILE",
+          "description": "Policy profile used when a call does not name one: how strictly the same signals are judged.",
+          "default": "default"
+        },
+        {
+          "name": "MONAPI_TIMEOUT",
+          "description": "Per-request timeout in seconds.",
+          "default": "10"
+        }
+      ]
+    }
+  ]
+}

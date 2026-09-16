@@ -27,3 +27,5 @@ engine/data/
 
 # Build output
 clients/node/dist/
+mcp/dist/
+*.tgz
