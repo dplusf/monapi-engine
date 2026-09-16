@@ -49,6 +49,39 @@ class TestCatalogue:
             for key in ("category", "weight", "severity", "source", "endpoints", "meaning", "guidance"):
                 assert sig.get(key), f"{sid} is missing {key}"
 
+    def test_every_category_has_a_source(self):
+        """The bug this catches: `free_mail` was documented, ignored by a
+        profile and referenced nowhere else — no feed produced it, so the
+        profile ignored a category that could never appear."""
+        catalogue = load_catalogue(str(CATALOGUE_PATH))
+        feeds = yaml.safe_load(
+            (ENGINE_ROOT / "app" / "data" / "feeds.yaml").read_text(encoding="utf-8")
+        )
+        from_feeds = {str(f.get("category")) for f in (feeds.get("feeds") or [])}
+
+        # Categories the code assigns directly, without a feed.
+        code = (ENGINE_ROOT / "app").rglob("*.py")
+        from_code = set()
+        for path in code:
+            for match in re.finditer(r'\bcategory="([a-z_]+)"', path.read_text(encoding="utf-8")):
+                from_code.add(match.group(1))
+
+        orphans = set(catalogue.categories) - from_feeds - from_code
+        assert not orphans, (
+            f"documented categories nothing can produce: {sorted(orphans)} — "
+            "either wire up a source or drop them from signals.yaml"
+        )
+
+    def test_every_feed_category_is_documented(self):
+        feeds = yaml.safe_load(
+            (ENGINE_ROOT / "app" / "data" / "feeds.yaml").read_text(encoding="utf-8")
+        )
+        catalogue = load_catalogue(str(CATALOGUE_PATH))
+        undocumented = {
+            str(f.get("category")) for f in (feeds.get("feeds") or [])
+        } - set(catalogue.categories)
+        assert not undocumented, f"feed categories missing from signals.yaml: {sorted(undocumented)}"
+
     def test_categories_referenced_by_profiles_exist(self):
         """A profile that ignores or reweights a category nobody documents
         is a silent no-op — the catalogue is where that gets caught."""

@@ -109,6 +109,17 @@ feeds:
     weight: 35
     format: text
 
+  # --- Domains: free mailbox providers ---
+  # Not abuse: an attribute of the address. Weight is low on purpose and
+  # profiles decide what it is worth — a B2B lead form cares, a
+  # newsletter signup does not.
+  - name: freemail_willwhite
+    url: https://raw.githubusercontent.com/willwhite/freemail/master/data/free.txt
+    type: domain
+    category: free_mail
+    weight: 10
+    format: text
+
   # --- Domains: disposable email ---
   - name: disposable_ivolo
     url: https://raw.githubusercontent.com/ivolo/disposable-email-domains/master/index.json

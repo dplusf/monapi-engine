@@ -47,7 +47,7 @@ Two rules for consuming signals in code:
 | `abuse` | 15-40 | IP listed for attacks, spam or compromise by a public feed. |
 | `anonymizer` | 25 | Tor exit node or commercial VPN egress. |
 | `datacenter` | 15 | Hosting/cloud range — no residential user behind it. |
-| `free_mail` | 10 | Large free mailbox provider (gmail.com, gmx.de). No feed currently populates this category, so no signal is emitted for it today; the category exists because the newsletter profile ignores it and profiles may override it once a source is wired. **(not emitted by any configured feed today)** |
+| `free_mail` | 10 | Free mailbox provider (gmail.com, gmx.de, mail.ru). Not abuse, an attribute of the address: the sender has no domain of their own. Weight is low on purpose — a B2B lead form cares, a newsletter signup does not, and the profile decides. Paid privacy providers (posteo.de, mailbox.org) are deliberately absent from the source list; proton.me is missing although its free tier would qualify. |
 
 ## Signals
 
